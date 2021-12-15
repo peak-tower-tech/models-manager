@@ -1,2 +1,2 @@
-# models-manager
+# model-duplicator
 Laravel Package

@@ -1,0 +1,20 @@
+{
+    "name": "peak-tower-tech/models-manager",
+    "description": "duplicate,delete models with selected relation model as recursive",
+    "type": "library",
+    "license": "proprietary",
+    "autoload": {
+        "psr-4": {
+            "PeakTowerTech\\ModelsManager\\": "src"
+        }
+    },
+    "minimum-stability": "dev",
+    "require": {},
+    "extra": {
+        "laravel": {
+            "providers": [
+                "PeakTowerTech\\ModelsManager\\ModelsManagerServiceProvider"
+            ]
+        }
+    }
+}
