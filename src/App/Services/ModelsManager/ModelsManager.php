@@ -10,12 +10,14 @@ class ModelsManager implements ModelsManagerInterface
 {
 
     private Collection $duplicates;
+    private array $repository;
     private string $primaryKeyName;
     private array $models;
 
     public function __construct()
     {
         $this->duplicates = collect();
+        $this->repository = [];
         $this->primaryKeyName = config('modelsManager.defaultPrimaryKeyName');
         $this->models = config('modelsManager.modelsConfigs');
     }
@@ -23,7 +25,7 @@ class ModelsManager implements ModelsManagerInterface
     private function getModelConfig($model)
     {
         $class = get_class($model);
-            $config = isset($this->models[$class])?$this->models[$class]:null;
+        $config = isset($this->models[$class]) ? $this->models[$class] : null;
         if (is_null($config) || !(bool)count($config)) return false;
         return $config;
     }
@@ -32,7 +34,7 @@ class ModelsManager implements ModelsManagerInterface
     {
         if (isset($relationConfig['duplicateCallbackFunc'])) return $relationConfig['duplicateCallbackFunc'];
 
-        return function ($mainModel, $parentModel,$duplicates) use ($relationConfig) {
+        return function ($mainModel, $parentModel, $duplicates) use ($relationConfig) {
             $duplicate_key_values = $mainModel->toArray();
             unset($duplicate_key_values[$this->primaryKeyName]);
             $duplicate_key_values[$relationConfig['foreignKey']] = $parentModel[$relationConfig['localKey']];
@@ -40,7 +42,8 @@ class ModelsManager implements ModelsManagerInterface
         };
     }
 
-    private function duplicateRelationsModels($relation,$mainModel, $duplicatedModel, $config)
+
+    private function duplicateRelationsModels($relation, $mainModel, $duplicatedModel, $config)
     {
 
         foreach ($config[$relation] ?? [] as $relationClass => $relationConfig) {
@@ -60,7 +63,7 @@ class ModelsManager implements ModelsManagerInterface
             $relationModels = $queryBuilder->get();
 
             if ($this->getModelConfig($relationModels->first())) {
-                foreach ($relationModels as $relationModel){
+                foreach ($relationModels as $relationModel) {
                     $this->makeDuplicateWithRelations(
                         $relationModel,
                         $duplicatedModel,
@@ -84,7 +87,7 @@ class ModelsManager implements ModelsManagerInterface
             'class' => $class,
             'mainId' => $mainModel->{$this->primaryKeyName},
         ];
-        $newModel =(bool)count($newModelKeysValues)?$class::create($newModelKeysValues):null;
+        $newModel = (bool)count($newModelKeysValues) ? $class::create($newModelKeysValues) : null;
 
 
         if ($newModel) $duplicate['duplicateId'] = $newModel->{$this->primaryKeyName};
@@ -97,16 +100,16 @@ class ModelsManager implements ModelsManagerInterface
 
     private function makeDuplicate($mainModel, $parentModel = null, $duplicateCallbackFunc = null)
     {
-        $duplicates=$this->duplicates;
+        $duplicates = $this->duplicates;
         if (is_null($duplicateCallbackFunc)) {
-            $duplicateCallbackFunc = function ($mainModel, $parentModel = null,$duplicates) {
+            $duplicateCallbackFunc = function ($mainModel, $parentModel = null, $duplicates) {
                 $duplicate_key_values = $mainModel->toArray();
                 unset($duplicate_key_values[$this->primaryKeyName]);
                 return $duplicate_key_values;
             };
         }
 
-        $newModelKeysValues = $duplicateCallbackFunc($mainModel, $parentModel,$duplicates);
+        $newModelKeysValues = $duplicateCallbackFunc($mainModel, $parentModel, $duplicates);
         return $this->createAndCollectStats($mainModel, $newModelKeysValues);
     }
 
@@ -115,25 +118,89 @@ class ModelsManager implements ModelsManagerInterface
         $duplicatedModel = $this->makeDuplicate($mainModel, $parentModel, $callbackFunction);
         $config = $this->getModelConfig($duplicatedModel);
         if ($config) {
-            $this->duplicateRelationsModels('hasMany',$mainModel, $duplicatedModel, $config);
-            $this->duplicateRelationsModels('hasOne',$mainModel, $duplicatedModel, $config);
+            $this->duplicateRelationsModels('hasMany', $mainModel, $duplicatedModel, $config);
+            $this->duplicateRelationsModels('hasOne', $mainModel, $duplicatedModel, $config);
         }
     }
 
-    public function Duplicate($mainModel, $parentModel = null, $callbackFunction = null): Collection
+    public function Duplicate($mainModel, $parentModel = null, $callbackFunction = null)
     {
         DB::beginTransaction();
         try {
             $this->makeDuplicateWithRelations($mainModel, $parentModel, $callbackFunction);
             DB::commit();
-        }catch (DuplicatedModelNotFoundException $duplicatedModelNotFoundException){
+        } catch (DuplicatedModelNotFoundException $duplicatedModelNotFoundException) {
             DB::rollback();
-            dd($duplicatedModelNotFoundException,$this->duplicates->groupBy('class'));
-        }catch (\Throwable $throwable){
+            dd($duplicatedModelNotFoundException, $this->duplicates->groupBy('class'));
+        } catch (\Throwable $throwable) {
             DB::rollback();
             dd($throwable);
         }
         return $this->duplicates->groupBy('class');
+
+    }
+
+    private function getRelationsModels($relation, $mainModel, $config)
+    {
+
+        foreach ($config[$relation] ?? [] as $relationClass => $relationConfig) {
+
+            $relationConfig['foreignKey'] = $relationConfig['foreignKey'] ?? $mainModel->getForeignKey();
+            $relationConfig['localKey'] = $relationConfig['localKey'] ?? $mainModel->getKeyName();
+
+            $queryBuilder = $mainModel->$relation($relationClass, $relationConfig['foreignKey'], $relationConfig['localKey']);
+            if (isset($relationConfig['queryBuilderCallbackFunc'])) {
+                $queryBuilder == $relationConfig['queryBuilderCallbackFunc']($queryBuilder);
+            }
+
+            if (!(bool)$queryBuilder->count()) continue;
+
+            $relationModels = $queryBuilder->get();
+            if ($this->getModelConfig($relationModels->first())) {
+                foreach ($relationModels as $relationModel) {
+                    $this->getModelRelations($relationModel, $relationModel->id);
+                }
+            } else {
+
+                foreach ($relationModels as $relationModel) {
+                    $this->findModel($relationModel, $relationModel->id);
+
+                }
+            }
+
+        }
+
+    }
+
+    private function findModel($mainModel, $mainId)
+    {
+        $repository = $this->repository;
+
+        $class = get_class($mainModel);
+        $model = $class::findOrFail($mainId);
+
+
+        $this->repository[$class][] = $model;
+
+        return $model;
+    }
+
+
+    private function getModelRelations($mainModel, $mainId)
+    {
+        $mainModel = $this->findModel($mainModel, $mainId);
+        $config = $this->getModelConfig($mainModel);
+        if ($config) {
+            $this->getRelationsModels('hasMany', $mainModel, $config);
+            $this->getRelationsModels('hasOne', $mainModel, $config);
+        }
+    }
+
+    public function GetModelWithRelations($mainModel, $mainId)
+    {
+        $this->getModelRelations($mainModel, $mainId);
+
+        return $this->repository;
 
     }
 }

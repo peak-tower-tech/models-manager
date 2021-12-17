@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static Duplicate($mainModel,$parentModel=null,$callbackFunction=null)
+ * @method static GetModelWithRelations($mainModel,$mainId)
  *
  * @see \PeakTowerTech\ModelsManager\App\Services\ModelsManager\ModelsManager
  */
