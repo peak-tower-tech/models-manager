@@ -18,7 +18,7 @@ class ModelsManagerFacade extends Facade
      */
     public static function getFacadeAccessor(): string
     {
-        return 'ModelsManagers';
+        return 'ModelsManager';
     }
 }
 
