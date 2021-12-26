@@ -36,7 +36,7 @@ class ApiController
     public function duplicate(Request $request){
         $mainModel=$request->mainModelClass::findOrFail($request->mainModelId);
         $parentMode=$request->parentModelClass::findOrFail($request->parentTargetModelId);
-        return ModelsManagerFacade::Duplicate($mainModel,$parentMode);
+        return ModelsManagerFacade::Duplicate($mainModel,$parentMode,$request->relations);
     }
 
 }

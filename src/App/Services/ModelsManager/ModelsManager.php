@@ -5,6 +5,7 @@ namespace PeakTowerTech\ModelsManager\App\Services\ModelsManager;
 use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use PeakTowerTech\ModelsManager\App\Exceptions\DuplicatedModelNotFoundException;
 
 class ModelsManager implements ModelsManagerInterface
 {
@@ -43,10 +44,11 @@ class ModelsManager implements ModelsManagerInterface
     }
 
 
-    private function duplicateRelationsModels($relation, $mainModel, $duplicatedModel, $config)
+    private function duplicateRelationsModels($relation, $mainModel, $duplicatedModel, $config, $allowedRelations)
     {
 
         foreach ($config[$relation] ?? [] as $relationClass => $relationConfig) {
+            if (!in_array($relationClass, $allowedRelations)) continue;
 
             $relationConfig['foreignKey'] = $relationConfig['foreignKey'] ?? $mainModel->getForeignKey();
             $relationConfig['localKey'] = $relationConfig['localKey'] ?? $mainModel->getKeyName();
@@ -68,6 +70,7 @@ class ModelsManager implements ModelsManagerInterface
                         $relationModel,
                         $duplicatedModel,
                         $duplicateCallbackFunc,
+                        $allowedRelations
                     );
                 }
             } else {
@@ -87,12 +90,14 @@ class ModelsManager implements ModelsManagerInterface
             'class' => $class,
             'mainId' => $mainModel->{$this->primaryKeyName},
         ];
-        $newModel = (bool)count($newModelKeysValues) ? $class::create($newModelKeysValues) : null;
 
+
+        $newModel = (bool)count($newModelKeysValues) ? $class::create($newModelKeysValues) : null;
 
         if ($newModel) $duplicate['duplicateId'] = $newModel->{$this->primaryKeyName};
 
         $this->duplicates->push($duplicate);
+
         return $newModel;
 
     }
@@ -110,31 +115,43 @@ class ModelsManager implements ModelsManagerInterface
         }
 
         $newModelKeysValues = $duplicateCallbackFunc($mainModel, $parentModel, $duplicates);
-        return $this->createAndCollectStats($mainModel, $newModelKeysValues);
+        if ($newModelKeysValues) return $this->createAndCollectStats($mainModel, $newModelKeysValues);
     }
 
-    private function makeDuplicateWithRelations($mainModel, $parentModel = null, $callbackFunction = null)
+    private function makeDuplicateWithRelations($mainModel, $parentModel = null, $callbackFunction = null, $allowedRelations = [])
     {
         $duplicatedModel = $this->makeDuplicate($mainModel, $parentModel, $callbackFunction);
         $config = $this->getModelConfig($duplicatedModel);
         if ($config) {
-            $this->duplicateRelationsModels('hasMany', $mainModel, $duplicatedModel, $config);
-            $this->duplicateRelationsModels('hasOne', $mainModel, $duplicatedModel, $config);
+            $this->duplicateRelationsModels('hasMany', $mainModel, $duplicatedModel, $config, $allowedRelations);
+            $this->duplicateRelationsModels('hasOne', $mainModel, $duplicatedModel, $config, $allowedRelations);
         }
     }
 
-    public function Duplicate($mainModel, $parentModel = null, $callbackFunction = null)
+    public function Duplicate($mainModel, $parentModel = null, $allowedRelations = [])
     {
         DB::beginTransaction();
         try {
-            $this->makeDuplicateWithRelations($mainModel, $parentModel, $callbackFunction);
+            $config = $this->getModelConfig($mainModel);
+            if ($config) {
+                $this->duplicateRelationsModels('hasMany', $mainModel, $parentModel, $config, $allowedRelations);
+                $this->duplicateRelationsModels('hasOne', $mainModel, $parentModel, $config, $allowedRelations);
+            }
             DB::commit();
         } catch (DuplicatedModelNotFoundException $duplicatedModelNotFoundException) {
             DB::rollback();
-            dd($duplicatedModelNotFoundException, $this->duplicates->groupBy('class'));
+            dd(
+                $duplicatedModelNotFoundException,
+                $this->duplicates->groupBy('class')->toJson(),
+//                $this->duplicates->groupBy('class'),
+            );
         } catch (\Throwable $throwable) {
             DB::rollback();
-            dd($throwable);
+            dd(
+                $throwable instanceof DuplicatedModelNotFoundException,
+                $throwable,
+//                $this->duplicates->groupBy('class'),
+            );
         }
         return $this->duplicates->groupBy('class');
 

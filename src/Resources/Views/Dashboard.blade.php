@@ -2,35 +2,38 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
     <title>Model Dumper Dashboard</title>
-    {{--    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" rel="stylesheet"--}}
-    {{--          integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">--}}
-    {{--    --}}
-    <link href="{{asset('vuejs/bootstrap.min.css')}}" rel="stylesheet"
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" rel="stylesheet"
           integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
-    {{--    <script--}}
-    {{--        src="https://code.jquery.com/jquery-3.3.1.min.js"--}}
-    {{--        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="--}}
-    {{--        crossorigin="anonymous"></script>--}}
-    <script
-        src="{{asset('vuejs/jquery-3.3.1.min.js')}}"
-        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
-        crossorigin="anonymous"></script>
-    {{--    <script src="https://cdn.jsdelivr.net/npm/vue@2.5.17/dist/vue.min.js"></script>--}}
-    {{--    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>--}}
-    <script src="{{asset('vuejs/vue.js')}}"></script>
 
+    <script
+            src="https://code.jquery.com/jquery-3.3.1.min.js"
+            integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+            crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.5.17/dist/vue.min.js"></script>
+
+    <style>
+        .ptt {
+            /*background-color: #26292b;*/
+            padding: 30px;
+            border-radius: 20px;
+            margin: 20px;
+        }
+    </style>
 
 </head>
 
-<body>
+<body style="/*background-color: #26292b;*/">
 <div class="container" id="app">
-    <div class="card col-xs-12 mt-4">
+    <div class="card col-xs-12 mt-4" style="/*background-color: #181a1b;*/
+    color: #ffffff;
+    padding: 30px;
+    border-radius: 20px;">
         <div class="card-header">
             <form id="manage" class="form-inline" role="form">
-                <div class="col-3">
+                <div class="col-3 ">
                     <div class="col-12">
                         <label class="my-1 mr-2" for="mainModelClass">Main Model Class To Duplicate:</label>
-                        <select class="form-control form-control-sm mr-2" @change="mainModelClassChange()"
+                        <select class="form-control form-control-sm mr-2 w-100" @change="mainModelClassChange()"
                                 name="mainModelClass"
                                 id="mainModelClass" v-model="mainModelClass">
                             <option v-for="(parentConfig,mainModelClass) in modelClasses"
@@ -43,7 +46,7 @@
                     <div class="col-12" v-if="mainModelClass">
 
                         <label class="my-1 mr-2" for="mainModelId">Duplicate From Which Id :</label>
-                        <input class="form-control form-control-sm mr-2" v-model="mainModelId"
+                        <input class="form-control form-control-sm mr-2 w-100" v-model="mainModelId"
                                placeholder="database id">
                     </div>
                     <div class="col-12 mt-3" v-if="mainModelClass">
@@ -54,8 +57,8 @@
                     </div>
                 </div>
 
-                <div class="col-6">
-                    <div v-if="repository" class="mt-3">
+                <div class="col-6 " v-if="repository">
+                    <div class="mt-3">
                         <label class="my-1 mr-2" for="mainModelId">Choisen Relations For Duplicate :</label>
                         <div v-for="(attr,modellClass) in repository">
                             <input :id="modellClass" :value="modellClass"
@@ -74,10 +77,10 @@
                     </div>
                 </div>
 
-                <div class="col-3" v-if="relations.length">
+                <div class="col-3 " v-if="relations.length">
                     <div class="col-12">
                         <label class="my-1 mr-2" for="parentModelClass">Duplicate For Target Model Class :</label>
-                        <select class="form-control form-control-sm mr-2"
+                        <select class="form-control form-control-sm mr-2 w-100"
                                 name="parentModelClass"
                                 id="parentModelClass" v-model="parentModelClass">
                             <option v-for="(parentConfig,mainModelClass) in modelClasses"
@@ -102,9 +105,9 @@
 
                 </div>
                 <div v-if="results">
-                    <div v-for="modellClassname in results">
-                        <span>@{{ modellClassname }}</span>
-{{--                        <i style="color: green">@{{ results[modellClass].length }} duplicated</i>--}}
+                    <div v-for="(result,resultModelClass) in results">
+                        <span>@{{ resultModelClass }}</span>
+                        <i style="color: green">@{{ result.length }} duplicated</i>
                         <br/>
                     </div>
                 </div>
@@ -211,8 +214,8 @@
                     mainModelId: this.mainModelId,
                     parentTargetModelId: this.parentTargetModelId,
                     relations: this.relations,
-                }).fail(() => {
-                    alert('Error sending event.');
+                }).fail((error) => {
+                    alert(error.responseJSON.message);
                 }).then((data) => {
                     this.results = data
                 });
